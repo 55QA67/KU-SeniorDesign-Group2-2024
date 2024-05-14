@@ -173,6 +173,9 @@ fun PassengerCount() {
 }
 
 // This is way shows the passenger count
+// TODO: Press and hold to manually edit count, 
+// incase count is wrong, possibly have the reset in this.
+// (Multiple dialog boxes)
 @Composable
 fun PassengerCountText(modifier: Modifier = Modifier) {
     if (passCount.intValue < 0) {
