@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.theme
+package com.ce491.safe_ride.ui.theme
 
 import android.app.Activity
 import android.os.Build

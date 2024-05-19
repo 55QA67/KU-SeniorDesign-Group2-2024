@@ -1,20 +1,26 @@
-package com.example.myapplication
+package com.ce491.safe_ride
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.media.RingtoneManager
 import android.os.Bundle
 import android.view.OrientationEventListener
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
@@ -37,21 +43,26 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.ce491.safe_ride.ui.theme.MyApplicationTheme
 
 
 private val showDialog = mutableStateOf(false)
 private val inWay = mutableStateOf(true)
 private val passCount = mutableIntStateOf(0)
 private val rot = mutableStateOf(true)
+private val showCamera = mutableStateOf(true)
 
-class MainActivity : ComponentActivity() {
+
+class MainActivity : ComponentActivity(), SensorEventListener {
 
     private val cameraPermissionRequest =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val sensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
         val mOrientationListener: OrientationEventListener = object : OrientationEventListener(
             applicationContext
@@ -106,6 +117,39 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    // TODO: This needs to be tested
+    override fun onSensorChanged(event: SensorEvent) {
+        // alpha is calculated as t / (t + dT),
+        // where t is the low-pass filter's time-constant and
+        // dT is the event delivery rate.
+
+        val alpha = 0.8F
+
+        // Isolate the force of gravity with the low-pass filter.
+        val gravity = floatArrayOf(0F, 0F, 0F)
+        gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0]
+        gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
+        gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
+
+        print("GRAVITY $gravity")
+
+        // Remove the gravity contribution with the high-pass filter.
+        val linearAcceleration = floatArrayOf(0F, 0F, 0F)
+        linearAcceleration[0] = event.values[0] - gravity[0]
+        linearAcceleration[1] = event.values[1] - gravity[1]
+        linearAcceleration[2] = event.values[2] - gravity[2]
+
+        print("ACCELERATION $linearAcceleration")
+
+        showCamera.value = linearAcceleration[0] == 0F &&
+                           linearAcceleration[1] == 0F &&
+                           linearAcceleration[2] == 0F
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        TODO("Not yet implemented")
+    }
 }
 
 @Composable
@@ -118,7 +162,9 @@ fun PortraitMode() {
         // This is the show the camera in the app
         Box(contentAlignment = Alignment.BottomCenter,
             modifier = Modifier.padding(top = 95.dp).fillMaxSize()) {
-            CameraPreviewScreen(Modifier.fillMaxSize())
+            if (showCamera.value) {
+                CameraPreviewScreen(Modifier.fillMaxSize())
+            }
         }
     }
 }
@@ -132,30 +178,37 @@ fun LandscapeMode() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             // This is the show the camera in the app
             Box(contentAlignment = Alignment.BottomCenter) {
-                CameraPreviewScreen(Modifier.fillMaxSize())
+                if (showCamera.value) {
+                    CameraPreviewScreen(Modifier.fillMaxSize())
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PassengerCount() {
     // A column that helps with positioning things on the screen
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         // This is to test the background color change
-        FilledButton("Check") { inWay.value = !inWay.value }
+//        FilledButton("Check") { inWay.value = !inWay.value }
 
         // This is to test incrementing the passenger counter
-        FilledButton("Increment") { passCount.intValue++ }
+//        FilledButton("Increment") { passCount.intValue++ }
 
         // This is the passenger counter
-        PassengerCountText()
+        PassengerCountText(modifier = Modifier.combinedClickable(
+            onClick = { passCount.intValue++ },
+            onDoubleClick = { passCount.intValue-- },
+            onLongClick = { showDialog.value = true }
+        ))
 
         // This is to test decrementing the passenger counter
-        FilledButton("Decrement") { passCount.intValue-- }
+//        FilledButton("Decrement") { passCount.intValue-- }
 
         // This is to reset the passenger counter
-        FilledButton("Reset") { showDialog.value = true }
+//        FilledButton("Reset") { showDialog.value = true }
         if (showDialog.value) {
             ResetAlertDialog(
                 onDismissRequest = { showDialog.value = false },
