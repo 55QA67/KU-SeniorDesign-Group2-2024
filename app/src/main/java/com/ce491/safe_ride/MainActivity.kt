@@ -47,7 +47,7 @@ import com.ce491.safe_ride.ui.theme.MyApplicationTheme
 import kotlin.math.abs
 
 
-private const val debug = false
+private const val debug = true
 
 private val showDialog = mutableStateOf(false)
 private val inWay = mutableStateOf(true)
@@ -113,7 +113,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                         }
                     }
 
-                    sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+                    sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
 
                     if (debug) {
                         Column {
