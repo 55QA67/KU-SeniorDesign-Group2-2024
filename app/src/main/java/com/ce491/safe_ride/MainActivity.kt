@@ -44,13 +44,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.ce491.safe_ride.ui.theme.MyApplicationTheme
+import kotlin.math.abs
 
+
+private const val debug = false
 
 private val showDialog = mutableStateOf(false)
 private val inWay = mutableStateOf(true)
 private val passCount = mutableIntStateOf(0)
 private val rot = mutableStateOf(true)
 private val showCamera = mutableStateOf(true)
+private val linearAcceleration = mutableStateOf(floatArrayOf(0F, 0F, 0F))
+private val accuracyMain = mutableIntStateOf(0)
+private const val floatError = 0.005F
 
 
 class MainActivity : ComponentActivity(), SensorEventListener {
@@ -62,7 +68,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         super.onCreate(savedInstanceState)
 
         val sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        val sensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        val sensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
 
         val mOrientationListener: OrientationEventListener = object : OrientationEventListener(
             applicationContext
@@ -93,8 +99,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         setContent {
             MyApplicationTheme {
                 Surface(modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight(),
+                    .fillMaxWidth()
+                    .fillMaxHeight(),
                         color = (if (inWay.value) { Color.Green } else { Color.Red })
                 ) {
                     if (inWay.value) {
@@ -104,6 +110,17 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                             r.play()
                         } catch (e: Exception) {
                             print(e.stackTrace)
+                        }
+                    }
+
+                    sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+
+                    if (debug) {
+                        Column {
+                            Text(text = "Linear Acceleration: ${linearAcceleration.value[0]}, " +
+                                    "${linearAcceleration.value[1]}, " +
+                                    "${linearAcceleration.value[2]}")
+                            Text(text = "Accuracy: ${accuracyMain.intValue}")
                         }
                     }
 
@@ -118,37 +135,19 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
-    // TODO: This needs to be tested
+    // TODO: This might work, but the camera might freak out
+    // TODO: maybe change the floatError
     override fun onSensorChanged(event: SensorEvent) {
-        // alpha is calculated as t / (t + dT),
-        // where t is the low-pass filter's time-constant and
-        // dT is the event delivery rate.
 
-        val alpha = 0.8F
+        linearAcceleration.value = event.values
 
-        // Isolate the force of gravity with the low-pass filter.
-        val gravity = floatArrayOf(0F, 0F, 0F)
-        gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0]
-        gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1]
-        gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2]
-
-        print("GRAVITY $gravity")
-
-        // Remove the gravity contribution with the high-pass filter.
-        val linearAcceleration = floatArrayOf(0F, 0F, 0F)
-        linearAcceleration[0] = event.values[0] - gravity[0]
-        linearAcceleration[1] = event.values[1] - gravity[1]
-        linearAcceleration[2] = event.values[2] - gravity[2]
-
-        print("ACCELERATION $linearAcceleration")
-
-        showCamera.value = linearAcceleration[0] == 0F &&
-                           linearAcceleration[1] == 0F &&
-                           linearAcceleration[2] == 0F
+        showCamera.value = abs(event.values[0]) < floatError &&
+                abs(event.values[1]) < floatError &&
+                abs(event.values[2]) < floatError
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-        TODO("Not yet implemented")
+        accuracyMain.intValue = accuracy
     }
 }
 
@@ -161,7 +160,9 @@ fun PortraitMode() {
 
         // This is the show the camera in the app
         Box(contentAlignment = Alignment.BottomCenter,
-            modifier = Modifier.padding(top = 95.dp).fillMaxSize()) {
+            modifier = Modifier
+                .padding(top = 95.dp)
+                .fillMaxSize()) {
             if (showCamera.value) {
                 CameraPreviewScreen(Modifier.fillMaxSize())
             }
@@ -226,9 +227,6 @@ fun PassengerCount() {
 }
 
 // This is way shows the passenger count
-// TODO: Press and hold to manually edit count, 
-// incase count is wrong, possibly have the reset in this.
-// (Multiple dialog boxes)
 @Composable
 fun PassengerCountText(modifier: Modifier = Modifier) {
     if (passCount.intValue < 0) {
