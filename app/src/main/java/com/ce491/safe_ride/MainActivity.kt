@@ -1,20 +1,26 @@
-package com.example.myapplication
+package com.ce491.safe_ride
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.media.RingtoneManager
 import android.os.Bundle
 import android.view.OrientationEventListener
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
@@ -37,21 +43,32 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.ce491.safe_ride.ui.theme.MyApplicationTheme
+import kotlin.math.abs
 
+
+private const val debug = true
 
 private val showDialog = mutableStateOf(false)
 private val inWay = mutableStateOf(true)
 private val passCount = mutableIntStateOf(0)
 private val rot = mutableStateOf(true)
+private val showCamera = mutableStateOf(true)
+private val linearAcceleration = mutableStateOf(floatArrayOf(0F, 0F, 0F))
+private val accuracyMain = mutableIntStateOf(0)
+private const val floatError = 0.005F
 
-class MainActivity : ComponentActivity() {
+
+class MainActivity : ComponentActivity(), SensorEventListener {
 
     private val cameraPermissionRequest =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val sensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
 
         val mOrientationListener: OrientationEventListener = object : OrientationEventListener(
             applicationContext
@@ -82,8 +99,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             MyApplicationTheme {
                 Surface(modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight(),
+                    .fillMaxWidth()
+                    .fillMaxHeight(),
                         color = (if (inWay.value) { Color.Green } else { Color.Red })
                 ) {
                     if (inWay.value) {
@@ -93,6 +110,17 @@ class MainActivity : ComponentActivity() {
                             r.play()
                         } catch (e: Exception) {
                             print(e.stackTrace)
+                        }
+                    }
+
+                    sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI)
+
+                    if (debug) {
+                        Column {
+                            Text(text = "Linear Acceleration: ${linearAcceleration.value[0]}, " +
+                                    "${linearAcceleration.value[1]}, " +
+                                    "${linearAcceleration.value[2]}")
+                            Text(text = "Accuracy: ${accuracyMain.intValue}")
                         }
                     }
 
@@ -106,6 +134,21 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    // TODO: This might work, but the camera might freak out
+    // TODO: maybe change the floatError
+    override fun onSensorChanged(event: SensorEvent) {
+
+        linearAcceleration.value = event.values
+
+        showCamera.value = abs(event.values[0]) < floatError &&
+                abs(event.values[1]) < floatError &&
+                abs(event.values[2]) < floatError
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        accuracyMain.intValue = accuracy
+    }
 }
 
 @Composable
@@ -117,8 +160,12 @@ fun PortraitMode() {
 
         // This is the show the camera in the app
         Box(contentAlignment = Alignment.BottomCenter,
-            modifier = Modifier.padding(top = 95.dp).fillMaxSize()) {
-            CameraPreviewScreen(Modifier.fillMaxSize())
+            modifier = Modifier
+                .padding(top = 95.dp)
+                .fillMaxSize()) {
+            if (showCamera.value) {
+                CameraPreviewScreen(Modifier.fillMaxSize())
+            }
         }
     }
 }
@@ -132,30 +179,37 @@ fun LandscapeMode() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             // This is the show the camera in the app
             Box(contentAlignment = Alignment.BottomCenter) {
-                CameraPreviewScreen(Modifier.fillMaxSize())
+                if (showCamera.value) {
+                    CameraPreviewScreen(Modifier.fillMaxSize())
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PassengerCount() {
     // A column that helps with positioning things on the screen
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         // This is to test the background color change
-        FilledButton("Check") { inWay.value = !inWay.value }
+//        FilledButton("Check") { inWay.value = !inWay.value }
 
         // This is to test incrementing the passenger counter
-        FilledButton("Increment") { passCount.intValue++ }
+//        FilledButton("Increment") { passCount.intValue++ }
 
         // This is the passenger counter
-        PassengerCountText()
+        PassengerCountText(modifier = Modifier.combinedClickable(
+            onClick = { passCount.intValue++ },
+            onDoubleClick = { passCount.intValue-- },
+            onLongClick = { showDialog.value = true }
+        ))
 
         // This is to test decrementing the passenger counter
-        FilledButton("Decrement") { passCount.intValue-- }
+//        FilledButton("Decrement") { passCount.intValue-- }
 
         // This is to reset the passenger counter
-        FilledButton("Reset") { showDialog.value = true }
+//        FilledButton("Reset") { showDialog.value = true }
         if (showDialog.value) {
             ResetAlertDialog(
                 onDismissRequest = { showDialog.value = false },

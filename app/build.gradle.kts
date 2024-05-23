@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.myapplication"
+    namespace = "com.ce491.safe_ride"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.myapplication"
+        applicationId = "com.ce491.safe_ride"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
