@@ -1,19 +1,3 @@
-/*
- * Copyright 2022 The TensorFlow Authors. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package com.ce491.safe_ride
 
 import android.content.Context
@@ -22,7 +6,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
-import android.util.Log
 import android.view.View
 import androidx.core.content.ContextCompat
 import com.ce491.safe_ride.ml.DetectWithMetadata
@@ -41,9 +24,8 @@ class OverlayView(context: Context?) : View(context) {
     private var bounds = Rect()
 
     private var edgeThreshold = 50
-    private val lastKnownPositions = mutableMapOf<Int, RectF>()
 
-
+    private val objectTracker = ObjectTracker()
 
     init {
         initPaints()
@@ -76,6 +58,8 @@ class OverlayView(context: Context?) : View(context) {
 
         var personDetected = false
 
+        val rects = mutableListOf<RectF>()
+
         for (result in results) {
             if (result.scoreAsFloat > 0.75f && result.categoryAsString == "Person") {
                 personDetected = true
@@ -90,6 +74,7 @@ class OverlayView(context: Context?) : View(context) {
 
                 // Draw bounding box around detected objects
                 val drawableRect = RectF(left, top, right, bottom)
+                rects.add(drawableRect)
                 canvas.drawRect(drawableRect, boxPaint)
 
                 // Create text to display alongside detected objects
@@ -113,12 +98,19 @@ class OverlayView(context: Context?) : View(context) {
                 canvas.drawText(drawableText, left, top + bounds.height(), textPaint)
 
                 // Check if the person is detected and moving off the screen to the right
-                if (right > width - edgeThreshold) {
-                    inWay.value = true
-                    passCount.intValue++
-                }
+//                if (right > width - edgeThreshold) {
+//                    inWay.value = true
+//                    passCount.intValue++
+//                } else if (left < edgeThreshold) {
+//                    inWay.value = true
+//                    passCount.intValue--
+//                }
             }
         }
+
+        objectTracker.trackObjects(rects)
+
+        passCount.intValue = objectTracker.getPassCount()
 
         if (!personDetected) {
             inWay.value = true
