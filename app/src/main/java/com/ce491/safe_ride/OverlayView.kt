@@ -1,0 +1,136 @@
+package com.ce491.safe_ride
+
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
+import android.view.View
+import androidx.core.content.ContextCompat
+import com.ce491.safe_ride.ml.DetectWithMetadata
+import java.util.LinkedList
+import kotlin.math.max
+
+class OverlayView(context: Context?) : View(context) {
+
+    private var results: MutableList<DetectWithMetadata.DetectionResult> = LinkedList<DetectWithMetadata.DetectionResult>()
+    private var boxPaint = Paint()
+    private var textBackgroundPaint = Paint()
+    private var textPaint = Paint()
+
+    private var scaleFactor: Float = 1f
+
+    private var bounds = Rect()
+
+    private var edgeThreshold = 50
+
+    private val objectTracker = ObjectTracker()
+
+    init {
+        initPaints()
+    }
+
+    fun clear() {
+        textPaint.reset()
+        textBackgroundPaint.reset()
+        boxPaint.reset()
+        invalidate()
+        initPaints()
+    }
+
+    private fun initPaints() {
+        textBackgroundPaint.color = Color.BLACK
+        textBackgroundPaint.style = Paint.Style.FILL
+        textBackgroundPaint.textSize = 50f
+
+        textPaint.color = Color.WHITE
+        textPaint.style = Paint.Style.FILL
+        textPaint.textSize = 50f
+
+        boxPaint.color = ContextCompat.getColor(context!!, R.color.purple_500)
+        boxPaint.strokeWidth = 8F
+        boxPaint.style = Paint.Style.STROKE
+    }
+
+    override fun draw(canvas: Canvas) {
+        super.draw(canvas)
+
+        var personDetected = false
+
+        val rects = mutableListOf<RectF>()
+
+        for (result in results) {
+            if (result.scoreAsFloat > 0.75f && result.categoryAsString == "Person") {
+                personDetected = true
+                inWay.value = false
+                val boundingBox = result.locationAsRectF
+
+                // Scale the bounding box coordinates to match the view size
+                val top = boundingBox.top * scaleFactor
+                val bottom = boundingBox.bottom * scaleFactor
+                val left = boundingBox.left * scaleFactor
+                val right = boundingBox.right * scaleFactor
+
+                // Draw bounding box around detected objects
+                val drawableRect = RectF(left, top, right, bottom)
+                rects.add(drawableRect)
+                canvas.drawRect(drawableRect, boxPaint)
+
+                // Create text to display alongside detected objects
+                val drawableText =
+                    result.categoryAsString + " " +
+                            String.format("%.2f", result.scoreAsFloat * 100) + "%"
+
+                // Draw rect behind display text
+                textBackgroundPaint.getTextBounds(drawableText, 0, drawableText.length, bounds)
+                val textWidth = bounds.width()
+                val textHeight = bounds.height()
+                canvas.drawRect(
+                    left,
+                    top,
+                    left + textWidth + BOUNDING_RECT_TEXT_PADDING,
+                    top + textHeight + BOUNDING_RECT_TEXT_PADDING,
+                    textBackgroundPaint
+                )
+
+                // Draw text for detected object
+                canvas.drawText(drawableText, left, top + bounds.height(), textPaint)
+
+                // Check if the person is detected and moving off the screen to the right
+//                if (right > width - edgeThreshold) {
+//                    inWay.value = true
+//                    passCount.intValue++
+//                } else if (left < edgeThreshold) {
+//                    inWay.value = true
+//                    passCount.intValue--
+//                }
+            }
+        }
+
+        objectTracker.trackObjects(rects)
+
+        passCount.intValue = objectTracker.getPassCount()
+
+        if (!personDetected) {
+            inWay.value = true
+        }
+    }
+
+    fun updateResults(
+        detectionResults: MutableList<DetectWithMetadata.DetectionResult>,
+        imageWidth: Int,
+        imageHeight: Int
+    ) {
+        results = detectionResults
+
+        scaleFactor = max(width * 1f / imageWidth, height * 1f / imageHeight)
+
+        // Redraw the overlay
+        invalidate()
+    }
+
+    companion object {
+        private const val BOUNDING_RECT_TEXT_PADDING = 8
+    }
+}
