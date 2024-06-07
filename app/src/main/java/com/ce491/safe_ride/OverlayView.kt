@@ -23,9 +23,8 @@ class OverlayView(context: Context?) : View(context) {
 
     private var bounds = Rect()
 
-    private var edgeThreshold = 50
-
-    private val objectTracker = ObjectTracker()
+    private var rightEdgeThreshold = 50
+    private var leftEdgeThreshold = 100
 
     init {
         initPaints()
@@ -61,7 +60,7 @@ class OverlayView(context: Context?) : View(context) {
         val rects = mutableListOf<RectF>()
 
         for (result in results) {
-            if (result.scoreAsFloat > 0.75f && result.categoryAsString == "Person") {
+            if (result.scoreAsFloat > 0.70f && result.categoryAsString == "Person") {
                 personDetected = true
                 inWay.value = false
                 val boundingBox = result.locationAsRectF
@@ -98,19 +97,15 @@ class OverlayView(context: Context?) : View(context) {
                 canvas.drawText(drawableText, left, top + bounds.height(), textPaint)
 
                 // Check if the person is detected and moving off the screen to the right
-//                if (right > width - edgeThreshold) {
-//                    inWay.value = true
-//                    passCount.intValue++
-//                } else if (left < edgeThreshold) {
-//                    inWay.value = true
-//                    passCount.intValue--
-//                }
+                if (right > width * 0.9) {
+                    inWay.value = true
+                    passCount.intValue++
+                } else if (left < width * 0.5 && right < width * 0.75) {
+                    inWay.value = true
+                    passCount.intValue--
+                }
             }
         }
-
-        objectTracker.trackObjects(rects)
-
-        passCount.intValue = objectTracker.getPassCount()
 
         if (!personDetected) {
             inWay.value = true
