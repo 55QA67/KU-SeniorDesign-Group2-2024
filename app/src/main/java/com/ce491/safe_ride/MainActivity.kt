@@ -47,16 +47,16 @@ import com.ce491.safe_ride.ui.theme.MyApplicationTheme
 import kotlin.math.abs
 
 
-private const val debug = true
+private const val debug = false
 
 private val showDialog = mutableStateOf(false)
-private val inWay = mutableStateOf(true)
-private val passCount = mutableIntStateOf(0)
+val inWay = mutableStateOf(true)
+val passCount = mutableIntStateOf(0)
 private val rot = mutableStateOf(true)
 private val showCamera = mutableStateOf(true)
 private val linearAcceleration = mutableStateOf(floatArrayOf(0F, 0F, 0F))
 private val accuracyMain = mutableIntStateOf(0)
-private const val floatError = 0.005F
+private const val floatError = 5F
 
 
 class MainActivity : ComponentActivity(), SensorEventListener {
